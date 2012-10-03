@@ -1,0 +1,31 @@
+{
+    "name": "LilypondFonts",
+    "version": "0.1.0",
+    "description": "Small script to export SVG paths of Lilypond fonts to JS",
+    "homepage": "https://github.com/FlatIO/LilypondFonts",
+    "author": "The Flat.io team <flat_2014@labeip.epitech.eu>",
+    "license": "MIT",
+    "contributors": [
+        "Vincent Giersch <mail@vincent.sh>"
+    ],
+    "keywords": [
+        "lilypond", "font", "music", "engraving"
+    ],
+    "main": "./LilypondFonts.js",
+    "engines": {
+        "node": "*"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/FlatIO/LilypondFonts.js.git"
+    },
+    "bugs": {
+        "url": "https://github.com/FlatIO/LilypondFonts.js/issues"
+    },
+    "devDependencies" : {
+        "jshint"    : "latest"
+    },
+    "dependencies" : {
+        "libxml-to-js" : "0.3.10"      
+    }
+}
