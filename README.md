@@ -1,10 +1,10 @@
 LilypondFonts
 =============
 
-Small script to export SVG paths of Lilypond fonts to JS.
+Small script to export SVG paths of Lilypond fonts to JSON.
 
 Usage :
 
 ```
-$ node LilypondFonts.js emmentaler-16.svg emmentaler-brace.svg > font.js
+$ node LilypondFonts.js emmentaler-16.svg emmentaler-brace.svg > font.json
 ```

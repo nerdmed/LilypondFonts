@@ -1,7 +1,7 @@
 {
     "name": "LilypondFonts",
     "version": "0.1.0",
-    "description": "Small script to export SVG paths of Lilypond fonts to JS",
+    "description": "Small script to export SVG paths of Lilypond fonts to JSON.",
     "homepage": "https://github.com/FlatIO/LilypondFonts",
     "author": "The Flat.io team <flat_2014@labeip.epitech.eu>",
     "license": "MIT",

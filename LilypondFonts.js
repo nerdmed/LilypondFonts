@@ -31,7 +31,7 @@ var util = require('util'),
                     }
 
                     if (--done === 0) {
-                        console.log('var Fermata = Fermata || {} ; Fermata.font = ' + JSON.stringify(output) + ';');
+                        util.puts(JSON.stringify(output));
                     }
                 }
             }
