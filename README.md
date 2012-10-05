@@ -9,8 +9,6 @@ Requirements:
 $ npm install libxml-to-js
 ```
 
-libxml-to-js: https://github.com/SaltwaterC/libxml-to-js
-
 Usage:
 
 ```
