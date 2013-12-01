@@ -1,6 +1,6 @@
 {
     "name": "lilypondfonts",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "description": "Small script to export SVG paths of Lilypond fonts to JSON.",
     "homepage": "https://github.com/FlatIO/LilypondFonts",
     "author": "Vincent Giersch <mail@vincent.sh>",

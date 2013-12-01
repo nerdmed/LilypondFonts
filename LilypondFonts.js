@@ -26,7 +26,7 @@ var util = require('util'),
                     console.error('This XML is not a Lilypond font : ' + process.argv[i]);
                 }
                 else {
-                    output.meta = result.defs.font['font-face'];
+                    output.meta = result.defs.font['font-face']['@'];
 
                     for (var j = 0 ; j < result.defs.font.glyph.length ; ++j) {
                         output.glyphs[result.defs.font.glyph[j]['@']['glyph-name']] = result.defs.font.glyph[j]['@'].d;
