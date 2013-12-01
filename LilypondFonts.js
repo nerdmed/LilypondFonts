@@ -14,7 +14,7 @@ var util = require('util'),
         process.exit(1);
     }
 
-    var output = {}, done = process.argv.length - 2;
+    var output = { glyphs: {} }, done = process.argv.length - 2;
     for (var i = 2 ; i < process.argv.length ; ++i) {
         var xml = fs.readFileSync(process.argv[i], 'utf-8');
 
@@ -26,8 +26,10 @@ var util = require('util'),
                     console.error('This XML is not a Lilypond font : ' + process.argv[i]);
                 }
                 else {
+                    output.meta = result.defs.font['font-face'];
+
                     for (var j = 0 ; j < result.defs.font.glyph.length ; ++j) {
-                        output[result.defs.font.glyph[j]['@']['glyph-name']] = result.defs.font.glyph[j]['@'].d;
+                        output.glyphs[result.defs.font.glyph[j]['@']['glyph-name']] = result.defs.font.glyph[j]['@'].d;
                     }
 
                     if (--done === 0) {
