@@ -29,7 +29,11 @@ var util = require('util'),
                     output.meta = result.defs.font['font-face']['@'];
 
                     for (var j = 0 ; j < result.defs.font.glyph.length ; ++j) {
-                        output.glyphs[result.defs.font.glyph[j]['@']['glyph-name']] = result.defs.font.glyph[j]['@'].d;
+                        output.glyphs[result.defs.font.glyph[j]['@']['glyph-name']] = {
+                          d: result.defs.font.glyph[j]['@'].d,
+                          h: 0,
+                          w: 0
+                        };
                     }
 
                     if (--done === 0) {
