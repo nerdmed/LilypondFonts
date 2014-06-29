@@ -3,45 +3,162 @@
 //
 
 var util = require('util'),
-    fs = require('fs'),
-    parser = require('libxml-to-js');
+  fs = require('fs'),
+  async = require('waterfall'),
+  parser = require('libxml-to-js');
 
 (function () {
-    "use strict";
+  "use strict";
 
-    if (process.argv.length <= 2) {
-        console.error('Usage: node LilypondFonts.js [font.svg ...]');
-        process.exit(1);
+  if (process.argv.length <= 2) {
+    console.error('Usage: node LilypondFonts.js glyphnames.json font_directory [whileListFile]');
+    process.exit(1);
+  }
+
+  var METADATA_RELATIVE_PATH = '/metadata.json';
+  var FONT_RELATIVE_PATH = '/font.svg';
+
+  var output = {
+    glyphs: {}
+  };
+  var fontDirectory = process.argv[2];
+  var metadataPath = fontDirectory + METADATA_RELATIVE_PATH;
+  var fontPath = fontDirectory + FONT_RELATIVE_PATH;
+  var glyphNamesPath = process.argv[3];
+  var whileListPath = process.argv[4];
+
+
+
+
+  var fillMetaData = function (output, metadata, callback) {
+    output.engravingDefaults = metadata.engravingDefaults;
+    output.fontName = metadata.fontName;
+    output.fontVersion = metadata.fontVersion;
+
+    var sectionsToCopy = ['glyphBBoxes', 'glyphsWithAnchors'];
+    for (var i = 0; i < sectionsToCopy.length; i++) {
+      var sectionName = sectionsToCopy[i];
+      var sectionToCopy = metadata[i];
+      for (var glyphName in output) {
+        var glyphMetadata = sectionToCopy[glyphName];
+        if (typeof glyphMetadata === 'undefined') {
+          var msg = 'glyph name ' + glyphName +
+            ' is not present inside the ' + sectionName + 'meta-data section';
+          return callback(new Error(msg));
+        } else {
+          var glyphData = output[glyphName];
+          shallowExtend(glyphMetadata, glyphMetadata);
+        }
+      }
     }
 
-    var output = { glyphs: {} }, done = process.argv.length - 2;
-    for (var i = 2 ; i < process.argv.length ; ++i) {
-        var xml = fs.readFileSync(process.argv[i], 'utf-8');
+    callback(null, output);
+  };
 
-        parser(xml, function (error, result) {
-            if (error) {
-                console.error(error);
-            } else {
-                if (!result.defs || !result.defs.font || !result.defs.font.glyph) {
-                    console.error('This XML is not a Lilypond font : ' + process.argv[i]);
-                }
-                else {
-                    output.meta = result.defs.font['font-face']['@'];
-
-                    for (var j = 0 ; j < result.defs.font.glyph.length ; ++j) {
-                        output.glyphs[result.defs.font.glyph[j]['@']['glyph-name']] = {
-                          d: result.defs.font.glyph[j]['@'].d,
-                          h: 0,
-                          w: 0
-                        };
-                    }
-
-                    if (--done === 0) {
-                        util.puts(JSON.stringify(output));
-                    }
-                }
-            }
-        });
+  var shallowExtend = function (objToExtend, src) {
+    for (var prop in src) {
+      if (src.hasOwnProperty(src)) {
+        objToExtend[prop] = src[prop];
+      }
     }
+  };
+
+  var fillSvgPath = function (output, svgData, callback) {
+    if (!svgData.defs || !svgData.defs.font || !svgData.defs.font.glyph) {
+      callback(new Error('This XML is not a valid music font'));
+    } else {
+      output.meta = svgData.defs.font['font-face']['@'];
+
+      var glyphSvgs = svgData.defs.font.glyph;
+      glyphSvgs = indexArray(indexArray, function (svgGlyph) {
+        return svgGlyph['@']['glyph-name'];
+      });
+
+      for (var glyphName in output.glyphs) {
+        var glyph = output[glyphName];
+        var codepoint = glyph.codepoint;
+        codepoint = codepoint.replace(/^U\+/, 'uni');
+        var glyphSvg = glyphSvgs[codepoint];
+        glyph.path = glyphSvg['@'].d;
+      }
+    }
+  };
+
+  var indexArray = function (array, getId) {
+    var index = {};
+    array.forEach(function (item) {
+      var id = getId(item);
+      index[id] = item;
+    });
+    return index;
+  };
+
+  var loadFilteredGlyphNames = function (glyphNamesPath, whiteListPath, callback) {
+    var parallelTasks = {
+      glyphNames: loadAndParseJson.bind(null, glyphNamesPath)
+    };
+    if (whiteListPath) {
+      parallelTasks.whiteList = loadAndParseJson.bind(null, whiteListPath);
+    }
+    async.parallel(
+      parallelTasks,
+      function (err, results) {
+        if (err) {
+          callback(err);
+        } else if (results.whiteList) {
+          filterGlyphNames(results.glyphNames, results.whiteList, callback);
+        } else {
+          callback(null, results.glyphNames);
+        }
+      }
+    );
+  };
+
+  var filterGlyphNames = function (glyphNames, whiteList, callback) {
+    var filteredGlyphNames = {};
+    for (var glyphName in whiteList) {
+      if (typeof glyphNames[glyphName] === 'undefined') {
+        return callback(new Error('the glyph ' + glyphName + 'from the white list is not defined in glyphnames.json'));
+      } else {
+        filteredGlyphNames[filteredGlyphNames] = glyphNames[glyphName];
+      }
+    }
+    callback(null, filteredGlyphNames);
+  };
+
+
+  var loadAndParseJson = function (path, callback) {
+    async.waterfall([
+
+      function loadFile(callback) {
+        fs.readFile(path, 'utf-8', callback);
+      },
+      function parseFile(data, callback) {
+        try {
+          var json = JSON.parse(data);
+          callback(null, json);
+        } catch (e) {
+          if (e instanceof SyntaxError) {
+            callback(e);
+          } else {
+            throw e;
+          }
+        }
+      }
+    ], callback);
+  };
+
+  var loadAndParseXml = function (path, callback) {
+    async.waterfall([
+
+      function loadFile(callback) {
+        fs.readFile(path, 'utf-8', callback);
+      },
+      parser
+    ], callback);
+  };
+
+
+  util.puts(JSON.stringify(output));// je me le garde sous le coude..
 
 }).call(this);
