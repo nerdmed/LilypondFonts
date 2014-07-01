@@ -27,9 +27,6 @@ var util = require('util'),
   var glyphNamesPath = process.argv[3];
   var whileListPath = process.argv[4];
 
-
-
-
   var fillMetaData = function (output, metadata, callback) {
     output.engravingDefaults = metadata.engravingDefaults;
     output.fontName = metadata.fontName;
@@ -106,7 +103,7 @@ var util = require('util'),
         if (err) {
           callback(err);
         } else if (results.whiteList) {
-          filterGlyphNames(results.glyphNames, results.whiteList, callback);
+          filterMainGlyphes(results.glyphNames, results.whiteList, callback);
         } else {
           callback(null, results.glyphNames);
         }
@@ -114,9 +111,45 @@ var util = require('util'),
     );
   };
 
-  var filterGlyphNames = function (glyphNames, whiteList, callback) {
+  var filterAlternativeGlyphes = function (output, glyphsWithAlternates, whiteList, callback) {
+    var filteredGlyphsWithAlternates = filterProperties(glyphsWithAlternates, output);
+    var alternatesGlyphes = flattenProperties(filteredGlyphsWithAlternates);
+    var filteredAlternatesGlyphes = filterProperties(alternatesGlyphes, whiteList);
+
+    for (var glyphName in whiteList.alternateGlyphes) {
+      if (typeof filteredAlternatesGlyphes[glyphName] !== 'undefined') {
+        output[glyphName] = filteredAlternatesGlyphes[glyphName];
+      } else {
+        console.log('the alternate glyph ' + glyphName + ' is not inside the font metadata');
+      }
+    }
+    callback(null, output);
+  };
+
+  var filterProperties = function (object, whiteList) {
+    var filtered = {};
+    for (var prop in whiteList) {
+      if (typeof object[prop] !== 'undefined') {
+        filtered[prop] = object[prop];
+      }
+    }
+    return filtered;
+  };
+
+  var flattenProperties = function (src) {
+    var dest = {};
+    for (var sectionName in src) {
+      var section = src[sectionName];
+      for (var prop in section) {
+        dest[prop] = section[prop];
+      }
+    }
+    return dest;
+  };
+
+  var filterMainGlyphes = function (glyphNames, whiteList, callback) {
     var filteredGlyphNames = {};
-    for (var glyphName in whiteList) {
+    for (var glyphName in whiteList.mainGlyphes) {
       if (typeof glyphNames[glyphName] === 'undefined') {
         return callback(new Error('the glyph ' + glyphName + 'from the white list is not defined in glyphnames.json'));
       } else {
@@ -159,6 +192,6 @@ var util = require('util'),
   };
 
 
-  util.puts(JSON.stringify(output));// je me le garde sous le coude..
+  util.puts(JSON.stringify(output)); // je me le garde sous le coude..
 
 }).call(this);
