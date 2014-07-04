@@ -1,11 +1,10 @@
-LilypondFonts
+SMuFLFonts
 =============
 
-Small script to export SVG paths of Lilypond fonts to JSON.
+Small script to export SVG paths of SMuFL fonts to JSON.
 
 Usage :
 
 ```
-$ node LilypondFonts.js emmentaler-16.svg emmentaler-brace.svg > font.tmp.json
-$ phantomjs LilypondFontsBBox.js fonts.tmp.json > font.json
+$ node SMuFLFonts.js -f ./bravura-1.02 -o ./smufl-metadata-1.0/glyphnames.json -o ./fonts/bravura.json -w ./filter/whiteList.json -i 2
 ```

@@ -9,7 +9,7 @@
     "keywords": [
         "SMuFL", "font", "music", "engraving"
     ],
-    "main": "./LilypondFonts.js",
+    "main": "./SMuFLFonts.js",
     "engines": {
         "node": "*"
     },
