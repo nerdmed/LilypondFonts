@@ -6,7 +6,7 @@ var fs = require('fs'),
   path = require('path'),
   console = require('console'),
   os = require('os'),
-  async = require('waterfall'),
+  async = require('async'),
   parser = require('libxml-to-js'),
   yargs = require('yargs');
 

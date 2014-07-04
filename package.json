@@ -25,6 +25,7 @@
     },
     "dependencies" : {
         "libxml-to-js" : "0.3.10",
-        "yargs": "latest"
+        "yargs": "latest",
+        "async": "latest"
     }
 }
