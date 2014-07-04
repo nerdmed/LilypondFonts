@@ -2,32 +2,115 @@
 // LilypondFonts
 //
 
-var util = require('util'),
-  fs = require('fs'),
+var fs = require('fs'),
+  path = require('path'),
+  console = require('console'),
+  os = require('os'),
   async = require('waterfall'),
-  parser = require('libxml-to-js');
+  parser = require('libxml-to-js'),
+  yargs = require('yargs');
 
 (function () {
   "use strict";
 
-  if (process.argv.length <= 2) {
-    console.error('Usage: node LilypondFonts.js glyphnames.json font_directory [whileListFile]');
-    process.exit(1);
-  }
+  var METADATA_RELATIVE_PATH = 'metadata.json';
+  var FONT_RELATIVE_PATH = 'font.svg';
+  var FILE_MODE = 1204; // 0644
 
-  var METADATA_RELATIVE_PATH = '/metadata.json';
-  var FONT_RELATIVE_PATH = '/font.svg';
+  yargs.alias('f', 'font');
+  yargs.alias('m', 'metadata');
+  yargs.alias('o', 'output');
+  yargs.alias('w', 'whiteList');
+  yargs.alias('i', 'indent');
+  yargs.demand(['f', 'm', 'o']);
+  yargs.describe({
+    'f': 'The font folder',
+    'm': 'The SMuFL `glyphnames.json` file',
+    'o': 'Path to the output file',
+    'w': 'optional path to a white list file to filter glyphes to include in the output',
+    'i': 'optional indent value for pretty print'
+  });
 
-  var output = {
-    glyphs: {}
+  var usageMsg = 'Convert a SMuFL font to a json file to be used by Adagio music library' + os.EOL +
+    'The font folder must contains 2 files:' + os.EOL +
+    ' - ' + FONT_RELATIVE_PATH + ', an xml file containing the svg paths' + os.EOL +
+    ' - ' + METADATA_RELATIVE_PATH + ', a json file containing the font metadata';
+  yargs.usage(usageMsg);
+  yargs.example('$0 -f ./bravura-1.02 -o ./smufl-metadata-1.0/glyphnames.json -o ./fonts/bravura.json -w ./filter/whiteList.json -i 2', 'generate a formatted json using a filter');
+
+  var argv = yargs.argv;
+
+  var fontDirectory = argv.f;
+  var metadataPath = fontDirectory + path.sep + METADATA_RELATIVE_PATH;
+  var fontPath = fontDirectory + path.sep + FONT_RELATIVE_PATH;
+  var glyphNamesPath = argv.m;
+  var whiteListPath = argv.w;
+  var outputPath = argv.o;
+  var indentValue = argv.i;
+
+  async.auto({
+    whiteList: function (callback) {
+      loadWhiteList(whiteListPath, callback);
+    },
+    mainGlyphes: function (callback) {
+      loadAndParseJson(glyphNamesPath, callback);
+    },
+    metaData: function (callback) {
+      loadAndParseJson(metadataPath, callback);
+    },
+    filteredMainGlyphes: ['mainGlyphes', 'whiteList',
+      function (callback, results) {
+        filterMainGlyphes(results.mainGlyphes, results.whiteList, callback);
+    }],
+    filteredAlternateGlyphes: ['metaData', 'whiteList',
+      function (callback, results) {
+        var glyphsWithAlternates = results.metaData.glyphsWithAlternates;
+        filterAlternatesGlyphes(glyphsWithAlternates, results.whiteList, callback);
+    }],
+    fontSvgs: function (callback) {
+      loadAndParseXml(fontPath, callback);
+    },
+    output: ['filteredAlternateGlyphes', 'filteredMainGlyphes', 'metaData', 'fontSvgs',
+      function (callback, results) {
+        var mainGlyphes = results.filteredMainGlyphes;
+        var alternateGlyphes = results.filteredAlternateGlyphes;
+        var metaData = results.metaData;
+        var fontSvgs = results.fontSvgs;
+        fillOutput(mainGlyphes, alternateGlyphes, callback);
+    }],
+    write: ['output',
+      function (callback, results) {
+        var output = results.output;
+        var outputStr = JSON.stringify(output, null, indentValue);
+        console.info('writting ' + outputPath);
+        fs.writeFile(outputPath, outputStr, {
+          mode: FILE_MODE
+        }, callback);
+    }]
+  }, function (err) {
+    if (err) {
+      console.error(err.message);
+    }
+  });
+
+  var fillOutput = function (mainGlyphes, alternateGlyphes, metaData, fontSvgs, callback) {
+    var output = {
+      glyphs: {}
+    };
+
+    shallowExtend(output.glyphs, mainGlyphes);
+    shallowExtend(output.glyphs, alternateGlyphes);
+
+    try {
+      fillMetaData(output, metaData);
+      fillSvgPath(output, fontSvgs);
+      callback(null, output);
+    } catch (e) {
+      callback(e);
+    }
   };
-  var fontDirectory = process.argv[2];
-  var metadataPath = fontDirectory + METADATA_RELATIVE_PATH;
-  var fontPath = fontDirectory + FONT_RELATIVE_PATH;
-  var glyphNamesPath = process.argv[3];
-  var whileListPath = process.argv[4];
 
-  var fillMetaData = function (output, metadata, callback) {
+  var fillMetaData = function (output, metadata) {
     output.engravingDefaults = metadata.engravingDefaults;
     output.fontName = metadata.fontName;
     output.fontVersion = metadata.fontVersion;
@@ -41,15 +124,13 @@ var util = require('util'),
         if (typeof glyphMetadata === 'undefined') {
           var msg = 'glyph name ' + glyphName +
             ' is not present inside the ' + sectionName + 'meta-data section';
-          return callback(new Error(msg));
+          throw new Error(msg);
         } else {
           var glyphData = output[glyphName];
           shallowExtend(glyphMetadata, glyphMetadata);
         }
       }
     }
-
-    callback(null, output);
   };
 
   var shallowExtend = function (objToExtend, src) {
@@ -60,14 +141,14 @@ var util = require('util'),
     }
   };
 
-  var fillSvgPath = function (output, svgData, callback) {
+  var fillSvgPath = function (output, svgData) {
     if (!svgData.defs || !svgData.defs.font || !svgData.defs.font.glyph) {
-      callback(new Error('This XML is not a valid music font'));
+      throw new Error('This XML is not a valid music font');
     } else {
       output.meta = svgData.defs.font['font-face']['@'];
 
       var glyphSvgs = svgData.defs.font.glyph;
-      glyphSvgs = indexArray(indexArray, function (svgGlyph) {
+      glyphSvgs = indexArray(indexArray, function getId(svgGlyph) {
         return svgGlyph['@']['glyph-name'];
       });
 
@@ -75,6 +156,9 @@ var util = require('util'),
         var glyph = output[glyphName];
         var codepoint = glyph.codepoint;
         codepoint = codepoint.replace(/^U\+/, 'uni');
+        if (typeof glyphSvgs[codepoint] === 'undefined') {
+          throw new Error('the glyph ' + glyphName + '[' + codepoint + '] does not appear in the svg file. ');
+        }
         var glyphSvg = glyphSvgs[codepoint];
         glyph.path = glyphSvg['@'].d;
       }
@@ -90,40 +174,31 @@ var util = require('util'),
     return index;
   };
 
-  var loadFilteredGlyphNames = function (glyphNamesPath, whiteListPath, callback) {
-    var parallelTasks = {
-      glyphNames: loadAndParseJson.bind(null, glyphNamesPath)
-    };
-    if (whiteListPath) {
-      parallelTasks.whiteList = loadAndParseJson.bind(null, whiteListPath);
+  var filterAlternatesGlyphes = function (glyphsWithAlternates, whiteList, callback) {
+    var filteredGlyphsWithAlternates;
+    if (whiteList.mainGlyphes) {
+      filteredGlyphsWithAlternates = filterProperties(glyphsWithAlternates, whiteList.mainGlyphes);
+    } else {
+      filteredGlyphsWithAlternates = glyphsWithAlternates;
     }
-    async.parallel(
-      parallelTasks,
-      function (err, results) {
-        if (err) {
-          callback(err);
-        } else if (results.whiteList) {
-          filterMainGlyphes(results.glyphNames, results.whiteList, callback);
+
+    var alternatesGlyphes = flattenProperties(filteredGlyphsWithAlternates);
+
+    var filteredAlternatesGlyphes;
+    if (whiteList.alternateGlyphes) {
+      filteredAlternatesGlyphes = {};
+      for (var glyphName in whiteList.alternateGlyphes) {
+        if (typeof alternatesGlyphes[glyphName] !== 'undefined') {
+          filteredAlternatesGlyphes[glyphName] = alternatesGlyphes[glyphName];
         } else {
-          callback(null, results.glyphNames);
+          console.log('the alternate glyph ' + glyphName + ' is not inside the font metadata');
         }
       }
-    );
-  };
-
-  var filterAlternativeGlyphes = function (output, glyphsWithAlternates, whiteList, callback) {
-    var filteredGlyphsWithAlternates = filterProperties(glyphsWithAlternates, output);
-    var alternatesGlyphes = flattenProperties(filteredGlyphsWithAlternates);
-    var filteredAlternatesGlyphes = filterProperties(alternatesGlyphes, whiteList);
-
-    for (var glyphName in whiteList.alternateGlyphes) {
-      if (typeof filteredAlternatesGlyphes[glyphName] !== 'undefined') {
-        output[glyphName] = filteredAlternatesGlyphes[glyphName];
-      } else {
-        console.log('the alternate glyph ' + glyphName + ' is not inside the font metadata');
-      }
+    } else {
+      filteredAlternatesGlyphes = alternatesGlyphes;
     }
-    callback(null, output);
+
+    callback(null, filteredAlternatesGlyphes);
   };
 
   var filterProperties = function (object, whiteList) {
@@ -148,17 +223,32 @@ var util = require('util'),
   };
 
   var filterMainGlyphes = function (glyphNames, whiteList, callback) {
-    var filteredGlyphNames = {};
-    for (var glyphName in whiteList.mainGlyphes) {
-      if (typeof glyphNames[glyphName] === 'undefined') {
-        return callback(new Error('the glyph ' + glyphName + 'from the white list is not defined in glyphnames.json'));
-      } else {
-        filteredGlyphNames[filteredGlyphNames] = glyphNames[glyphName];
+    var filteredGlyphNames;
+
+    if (whiteList.mainGlyphes) {
+      filteredGlyphNames = {};
+      for (var glyphName in whiteList.mainGlyphes) {
+        if (typeof glyphNames[glyphName] === 'undefined') {
+          return callback(new Error('the glyph ' + glyphName + 'from the white list is not defined in glyphnames.json'));
+        } else {
+          filteredGlyphNames[filteredGlyphNames] = glyphNames[glyphName];
+        }
       }
+    } else {
+      filteredGlyphNames = glyphNames;
     }
+
     callback(null, filteredGlyphNames);
   };
 
+  var loadWhiteList = function (whiteListPath, callback) {
+    if (whiteListPath) {
+      loadAndParseJson(whiteListPath, callback);
+    } else {
+      var whiteList = {};
+      callback(null, whiteList);
+    }
+  };
 
   var loadAndParseJson = function (path, callback) {
     async.waterfall([
@@ -190,8 +280,5 @@ var util = require('util'),
       parser
     ], callback);
   };
-
-
-  util.puts(JSON.stringify(output)); // je me le garde sous le coude..
 
 }).call(this);

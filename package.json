@@ -1,13 +1,13 @@
 {
     "name": "lilypondfonts",
     "version": "0.2.0",
-    "description": "Small script to export SVG paths of Lilypond fonts to JSON.",
+    "description": "Small script to export SVG paths of SMuFL fonts to JSON usable by Adagio music library.",
     "homepage": "https://github.com/FlatIO/LilypondFonts",
     "author": "Vincent Giersch <mail@vincent.sh>",
     "license": "MIT",
     "contributors": [],
     "keywords": [
-        "lilypond", "font", "music", "engraving"
+        "SMuFL", "font", "music", "engraving"
     ],
     "main": "./LilypondFonts.js",
     "engines": {
@@ -25,6 +25,6 @@
     },
     "dependencies" : {
         "libxml-to-js" : "0.3.10",
-        "phantomjs": "latest"
+        "yargs": "latest"
     }
 }
