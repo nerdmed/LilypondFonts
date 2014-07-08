@@ -57,36 +57,36 @@ var actions = require('./lib/actions');
   async.auto({
     whiteList: function (callback) {
       if (whiteListPath) {
-        console.info('loading ' + whiteListPath);
+        console.info('[LOADING] ' + whiteListPath);
       }
       actions.loadWhiteList(whiteListPath, callback);
     },
     mainGlyphes: function (callback) {
-      console.info('loading ' + glyphNamesPath);
+      console.info('[LOADING] ' + glyphNamesPath);
       actions.loadAndParseJson(glyphNamesPath, callback);
     },
     metaData: function (callback) {
-      console.info('loading ' + metadataPath);
+      console.info('[LOADING] ' + metadataPath);
       actions.loadAndParseJson(metadataPath, callback);
     },
     filteredMainGlyphes: ['mainGlyphes', 'whiteList',
       function (callback, results) {
-        console.info('filtering main glyphes');
+        console.info('[FILERING] main glyphes');
         actions.filterMainGlyphes(results.mainGlyphes, results.whiteList, callback);
     }],
     filteredAlternateGlyphes: ['metaData', 'whiteList',
       function (callback, results) {
-        console.info('filtering alternates glyphes');
+        console.info('[FILTERING] alternates glyphes');
         var glyphsWithAlternates = results.metaData.glyphsWithAlternates;
         actions.filterAlternatesGlyphes(glyphsWithAlternates, results.whiteList, callback);
     }],
     fontSvgs: function (callback) {
-      console.info('loading ' + fontPath);
+      console.info('[LOADING] ' + fontPath);
       actions.loadAndParseXml(fontPath, callback);
     },
     output: ['filteredAlternateGlyphes', 'filteredMainGlyphes', 'metaData', 'fontSvgs',
       function (callback, results) {
-        console.info('generating output');
+        console.info('[GENERATE-OUTPUT]');
         var mainGlyphes = results.filteredMainGlyphes;
         var alternateGlyphes = results.filteredAlternateGlyphes;
         var metaData = results.metaData;
@@ -97,7 +97,7 @@ var actions = require('./lib/actions');
       function (callback, results) {
         var output = results.output;
         var outputStr = JSON.stringify(output, null, indentValue);
-        console.info('writting ' + outputPath);
+        console.info('[WRITE] ' + outputPath);
         fs.writeFile(outputPath, outputStr, {
           mode: FILE_MODE
         }, callback);
@@ -109,7 +109,7 @@ var actions = require('./lib/actions');
       console.log(err.stack);
       process.exit(1);
     } else {
-      console.info('Done. ');
+      console.info('[DONE]');
       process.exit(0);
     }
   });
